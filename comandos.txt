@@ -1,0 +1,10 @@
+* compilar: 
+    javac Server.java 
+    javac Client.java
+
+* rodar
+Servidor: 
+    java Server 2048
+
+cliente: 
+    java Client localhost 2048 movie.Mjpeg
