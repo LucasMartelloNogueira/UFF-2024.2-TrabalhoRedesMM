@@ -34,10 +34,10 @@ public class BufferProducer extends Thread {
     private void fowardToPlayoutBufferOrRandomDiscart(int discartProbabilityPercent, PacketData<RTPpacket> packet) {
         boolean willDiscartPacket = random.nextInt(0, 100) <= discartProbabilityPercent;
         if (willDiscartPacket) {
-            print(String.format("pacote %d perdido pela rede", packet.getPacket()));
+            print(String.format("pacote %d perdido pela rede", packet.getPacket().SequenceNumber));
             lostPackets.add(packet);
         } else {
-            print(String.format("retirou pacote %d do channelBuffer e adicionou ao playoutBuffer", packet.getPacket()));
+            print(String.format("retirou pacote %d do channelBuffer e adicionou ao playoutBuffer", packet.getPacket().SequenceNumber));
             playoutBuffer.add(packet);
         }
     }
@@ -65,14 +65,14 @@ public class BufferProducer extends Thread {
                 long now = System.currentTimeMillis();
                 PacketData<RTPpacket> packet = this.channelBuffer.removeFirst();
                 packet.setArrivalTimeMilllis(now); // TODO: melhor usar now ou setar tempo quando pacote chega no buffer + o jitter?
-            
+                
                 fowardToPlayoutBufferOrRandomDiscart(discartProbabilityPercent, packet);
 
                 long currTimeMilis = System.currentTimeMillis();
                 print(String.format("intervalo entre pacotes : %d", currTimeMilis - timestampMilis));
                 timestampMilis = currTimeMilis;
             } catch (Exception e) {
-                print(e.getMessage());
+                print(e.toString());
                 print("erro ao deixar a thread dormir / nao retirou elemento da fila");
 
             }
