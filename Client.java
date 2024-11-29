@@ -6,6 +6,7 @@
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.List;
 import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
@@ -54,6 +55,20 @@ public class Client {
   // Video constants:
   // ------------------
   static int MJPEG_TYPE = 26; // RTP payload type for MJPEG video
+
+  // parameters for playout buffer
+  int minDelayNetworkMillis = 200;
+  int maxDelayMillis = 400;
+  long initalPlayoutBufferDelay = 1000;
+  long consumeTimeMilis = 20;
+  long rebufferingDelayMilis = 1000;
+  int discartProbabilityPercent = 5;
+
+  PlayoutBuffer playoutBuffer = new PlayoutBuffer(initalPlayoutBufferDelay, consumeTimeMilis, rebufferingDelayMilis);
+  List<PacketData<RTPpacket>> channelBuffer = new ArrayList<>();
+
+  BufferProducer producer = new BufferProducer(minDelayNetworkMillis, maxDelayMillis, playoutBuffer, channelBuffer, discartProbabilityPercent);
+  BufferConsumer consumer = new BufferConsumer(channelBuffer, playoutBuffer, iconLabel);
 
   // --------------------------
   // Constructor
@@ -150,10 +165,6 @@ public class Client {
       if (state == INIT) {
         // Init non-blocking RTPsocket that will be used to receive data
         try {
-          // construct a new DatagramSocket to receive RTP packets from the server, on
-          //
-          // port RTP_RCV_PORT
-          // RTPsocket = ...
 
           RTPsocket = new DatagramSocket(RTP_RCV_PORT);
           RTPsocket.setSoTimeout(5);
@@ -210,6 +221,9 @@ public class Client {
           // change RTSP state and print out new state
           state = PLAYING;
           System.out.println("New RTSP state: PLAYING");
+
+          producer.start();
+          consumer.start();
 
           // start the timer
           timer.start();
@@ -305,24 +319,13 @@ public class Client {
         RTPpacket rtp_packet = new RTPpacket(rcvdp.getData(), rcvdp.getLength());
 
         // print important header fields of the RTP packet received:
-        System.out.println("Got RTP packet with SeqNum # " + rtp_packet.getsequencenumber() + " TimeStamp "
-            + rtp_packet.gettimestamp() + " ms, of type " + rtp_packet.getpayloadtype());
+        // System.out.println("Got RTP packet with SeqNum # " + rtp_packet.getsequencenumber() + " TimeStamp "
+        //     + rtp_packet.gettimestamp() + " ms, of type " + rtp_packet.getpayloadtype());
 
         // print header bitstream:
-        rtp_packet.printheader();
-
-        // get the payload bitstream from the RTPpacket object
-        int payload_length = rtp_packet.getpayload_length();
-        byte[] payload = new byte[payload_length];
-        rtp_packet.getpayload(payload);
-
-        // get an Image object from the payload bitstream
-        Toolkit toolkit = Toolkit.getDefaultToolkit();
-        Image image = toolkit.createImage(payload, 0, payload_length);
-
-        // display the image as an ImageIcon object
-        icon = new ImageIcon(image);
-        iconLabel.setIcon(icon);
+        // rtp_packet.printheader();
+        producer.addPacket(rtp_packet, rtp_packet.SequenceNumber);
+        
       } catch (InterruptedIOException iioe) {
         // System.out.println("Nothing to read");
       } catch (IOException ioe) {
