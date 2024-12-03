@@ -1,1 +1,4 @@
 *.class
+dist
+logs
+data.csv

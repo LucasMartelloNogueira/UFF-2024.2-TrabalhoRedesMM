@@ -6,7 +6,6 @@ import java.util.SplittableRandom;
 public class BufferProducer extends Thread {
 
     String threadName = "PRODUCER";
-    String separator = "#";
     SplittableRandom random = new SplittableRandom();
 
     private int minDelayMiliseconds;
@@ -27,7 +26,8 @@ public class BufferProducer extends Thread {
     }
 
     private void print(String message) {
-        Util.printInThread(threadName, separator, message);
+        AppLogger.log(threadName, message);
+        Util.printInThread(threadName, message);
     }
     
     // simula quando um pacote é perdido pela rede
@@ -53,36 +53,35 @@ public class BufferProducer extends Thread {
 
         while (true) {
 
-            // print(String.format("channel buffer size: %d", channelBuffer.size()));
+            print(String.format("channel buffer size: %d", channelBuffer.size()));
+            // print("aqui");
 
-            if (channelBuffer.size() == 0) {
-                continue;
-            }
+            if (channelBuffer.size() > 0) {
 
-            long networkDelay = new Random().nextInt(maxDelayMiliseconds - minDelayMiliseconds) + minDelayMiliseconds;
-            try {
-                Thread.sleep(networkDelay);
-                long now = System.currentTimeMillis();
-                PacketData<RTPpacket> packet = this.channelBuffer.removeFirst();
-                packet.setArrivalTimeMilllis(now); // TODO: melhor usar now ou setar tempo quando pacote chega no buffer + o jitter?
+                print("removendo pacote do channel buffer");
                 
-                fowardToPlayoutBufferOrRandomDiscart(discartProbabilityPercent, packet);
-
-                long currTimeMilis = System.currentTimeMillis();
-                // print(String.format("intervalo entre pacotes : %d", currTimeMilis - timestampMilis));
-                timestampMilis = currTimeMilis;
-            } catch (Exception e) {
-                // print(e.toString());
-                // print("erro ao deixar a thread dormir / nao retirou elemento da fila");
-
+                long networkDelay = new Random().nextInt(maxDelayMiliseconds - minDelayMiliseconds) + minDelayMiliseconds;
+                try {
+                    Thread.sleep(networkDelay);
+                    long now = System.currentTimeMillis();
+                    PacketData<RTPpacket> packet = this.channelBuffer.removeFirst();
+                    packet.setArrivalTimeMilllis(now);
+                    
+                    fowardToPlayoutBufferOrRandomDiscart(discartProbabilityPercent, packet);
+    
+                    long currTimeMilis = System.currentTimeMillis();
+                    // print(String.format("intervalo entre pacotes : %d", currTimeMilis - timestampMilis));
+                    timestampMilis = currTimeMilis;
+                } catch (Exception e) {
+                    // print(e.toString());
+                    // print("erro ao deixar a thread dormir / nao retirou elemento da fila");
+    
+                }
             }
+            
+            // System.out.println("[CHANNEL BUFFER] - aqui");
+
         }
 
-        // StringBuffer sb = new StringBuffer();
-        // sb.append("{");
-        // lostPackets.forEach(packetData -> sb.append(packetData.getPacket()));
-        // sb.append("}");
-
-        // print(String.format("lost packets: %s", sb.toString()));
     }
 }

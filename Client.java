@@ -6,26 +6,12 @@
 import java.io.*;
 import java.net.*;
 import java.util.*;
-import java.util.List;
 import java.util.function.Function;
-import java.awt.*;
-import java.awt.event.*;
-import javax.swing.*;
-import javax.swing.Timer;
+
 
 public class Client {
 
-  // GUI
-  // ----
-  // JFrame f = new JFrame("Client");
-  // JButton setupButton = new JButton("Setup");
-  // JButton playButton = new JButton("Play");
-  // JButton pauseButton = new JButton("Pause");
-  // JButton tearButton = new JButton("Teardown");
-  // JPanel mainPanel = new JPanel();
-  // JPanel buttonPanel = new JPanel();
-  // JLabel iconLabel = new JLabel();
-  // ImageIcon icon;
+
 
   // RTP variables:
   // ----------------
@@ -61,7 +47,7 @@ public class Client {
 
   // parameters for playout buffer
   int minDelayNetworkMillis = 200;
-  int maxDelayMillis = 400;
+  int maxNetworkDelayMillis = 400;
   long initalPlayoutBufferDelay = 1000;
   long consumeTimeMilis = 20;
   long rebufferingDelayMilis = 1000;
@@ -70,62 +56,15 @@ public class Client {
   PlayoutBuffer playoutBuffer = new PlayoutBuffer(initalPlayoutBufferDelay, consumeTimeMilis, rebufferingDelayMilis);
   List<PacketData<RTPpacket>> channelBuffer = new ArrayList<>();
 
-  BufferProducer producer = new BufferProducer(minDelayNetworkMillis, maxDelayMillis, playoutBuffer, channelBuffer, discartProbabilityPercent);
-  BufferConsumer consumer = new BufferConsumer(channelBuffer, playoutBuffer);
+  BufferProducer producer = new BufferProducer(minDelayNetworkMillis, maxNetworkDelayMillis, playoutBuffer, channelBuffer, discartProbabilityPercent);
+  BufferConsumer consumer = new BufferConsumer(playoutBuffer);
 
-  // --------------------------
-  // Constructor
-  // --------------------------
+
   public Client() {
 
-    // build GUI
-    // --------------------------
-
-    // Frame
-    // f.addWindowListener(new WindowAdapter() {
-    //   public void windowClosing(WindowEvent e) {
-    //     System.exit(0);
-    //   }
-    // });
-
-    // Buttons
-    // buttonPanel.setLayout(new GridLayout(1, 0));
-    // buttonPanel.add(setupButton);
-    // buttonPanel.add(playButton);
-    // buttonPanel.add(pauseButton);
-    // buttonPanel.add(tearButton);
-    // setupButton.addActionListener(new setupButtonListener());
-    // playButton.addActionListener(new playButtonListener());
-    // pauseButton.addActionListener(new pauseButtonListener());
-    // tearButton.addActionListener(new tearButtonListener());
-
-    // Image display label
-    // iconLabel.setIcon(null);
-
-    // frame layout
-    // mainPanel.setLayout(null);
-    // mainPanel.add(iconLabel);
-    // mainPanel.add(buttonPanel);
-    // iconLabel.setBounds(0, 0, 380, 280);
-    // buttonPanel.setBounds(0, 280, 380, 50);
-
-    // f.getContentPane().add(mainPanel, BorderLayout.CENTER);
-    // f.setSize(new Dimension(390, 370));
-    // f.setVisible(true);
-
-    // init timer
-    // --------------------------
-    // timer = new Timer(20, new timerListener());
-    // timer.setInitialDelay(0);
-    // timer.setCoalesce(true);
-
-    // allocate enough memory for the buffer used to receive data from the server
     buf = new byte[15000];
   }
 
-  // ------------------------------------
-  // main
-  // ------------------------------------
   public static void main(String argv[]) throws Exception {
     // Create a Client object
     Client theClient = new Client();
@@ -139,6 +78,11 @@ public class Client {
     // get video filename to request:
     VideoFileName = argv[2];
 
+    // parameters for simulation
+    theClient.maxNetworkDelayMillis = Integer.parseInt(argv[3]);
+    theClient.initalPlayoutBufferDelay = Integer.parseInt(argv[4]);
+    theClient.rebufferingDelayMilis = Integer.parseInt(argv[5]);
+
     // Establish a TCP connection with the server to exchange RTSP messages
     // ------------------
     theClient.RTSPsocket = new Socket(ServerIPAddr, RTSP_server_port);
@@ -150,9 +94,10 @@ public class Client {
     // init RTSP state:
     state = INIT;
 
+    long start = System.currentTimeMillis();
+
     theClient.setup();
-    theClient.play();
-    // theClient.teardown();
+    theClient.play(start);
   }
 
   class GetVideoTask extends TimerTask {
@@ -168,31 +113,23 @@ public class Client {
       rcvdp = new DatagramPacket(buf, buf.length);
 
       try {
-        
-        
         // receive the DP from the socket:
         RTPsocket.receive(rcvdp);
         
         // create an RTPpacket object from the DP
         RTPpacket rtp_packet = new RTPpacket(rcvdp.getData(), rcvdp.getLength());
-        System.out.printf("seq num: %d\n", rtp_packet.SequenceNumber);
+        // System.out.printf("seq num: %d\n", rtp_packet.SequenceNumber);
 
         // 65535: é o numero que vira quando server manda sequence number == -1
         if (rtp_packet.SequenceNumber == 65535) {
           callback.apply(null);
         }
 
-        // print important header fields of the RTP packet received:
-        // System.out.println("Got RTP packet with SeqNum # " + rtp_packet.getsequencenumber() + " TimeStamp "
-        //     + rtp_packet.gettimestamp() + " ms, of type " + rtp_packet.getpayloadtype());
-
-        // print header bitstream:
-        // rtp_packet.printheader();
         producer.addPacket(rtp_packet, rtp_packet.SequenceNumber);
-        System.out.printf("[CLIENT] - recebeu pacote %d\n", rtp_packet.SequenceNumber);
+        // System.out.printf("[CLIENT] - recebeu pacote %d\n", rtp_packet.SequenceNumber);
         
       } catch (InterruptedIOException iioe) {
-        System.out.println("Nothing to read");
+        // System.out.println("Nothing to read");
       } catch (IOException ioe) {
         System.out.println("Exception caught: " + ioe);
       } 
@@ -235,7 +172,7 @@ public class Client {
     }
   }
 
-  private void play() {
+  private void play(long start) {
     if (state == READY) {
       // increase RTSP sequence number
 
@@ -252,25 +189,23 @@ public class Client {
         state = PLAYING;
         System.out.println("New RTSP state: PLAYING");
 
-        producer.start();
-        consumer.start();
-
         // start the timer
         timer = new WaitingTimer(0, consumeTimeMilis);
         timer.setTask(new GetVideoTask((Void unused) -> {
           timer.stop();
-          teardown();
+          teardown(start);
           return null;
         }));
         timer.start();
 
+        producer.start();
+        consumer.start();
       }
     }
   }
 
-  private void teardown() {
+  private void teardown(long start) {
       
-      // TODO: save data to csv file
 
       RTSPSeqNb += 1;
 
@@ -288,203 +223,34 @@ public class Client {
         state = INIT;
         System.out.println("New RTSP state: INIT");
 
-        // stop the timer
-        // timer.stop();
+        long end = System.currentTimeMillis();
+        System.out.printf("total time: %d\n", end-start);
+        System.out.printf("time rebuferring: %d\n", playoutBuffer.getTimeSpentRebuffering());
+        System.out.printf("total times rebuffering: %d\n", playoutBuffer.getNumTimesRebuffering());
+        System.out.printf("num late packets: %d\n", playoutBuffer.getLatePackets().size());
 
-        // exit
+        Util.writeArrayListToCSV(getDataAsList(end-start), "../data.csv");
+
         System.exit(0);
       }
   }
 
-  // ------------------------------------
-  // Handler for buttons
-  // ------------------------------------
-
-  // .............
-  // TO COMPLETE
-  // .............
-
-  // Handler for Setup button
-  // -----------------------
-  class setupButtonListener implements ActionListener {
-    public void actionPerformed(ActionEvent e) {
-
-      // System.out.println("Setup Button pressed !");
-      if (state == INIT) {
-        // Init non-blocking RTPsocket that will be used to receive data
-        try {
-
-          RTPsocket = new DatagramSocket(RTP_RCV_PORT);
-          RTPsocket.setSoTimeout(5);
-
-        } catch (SocketException se) {
-          System.out.println("Socket exception: " + se);
-          System.exit(0);
-        }
-
-        // init RTSP sequence number
-        RTSPSeqNb = 1;
-
-        // Send SETUP message to the server
-        send_RTSP_request("SETUP");
-
-        int reply_code = parse_server_response();
-        // Wait for the response
-        if (reply_code!= 200)
-          System.out.println("Invalid Server Response");
-        else {
-          // change RTSP state and print new state
-          state = READY;
-          System.out.println("S: RTSP/1.0 " + reply_code + " OK");
-          // System.out.println(String.format("S: RTSP/1.0 %d OK", reply_code));  
-          System.out.println("S: CSeq: " + RTSPSeqNb);
-          System.out.println("S: Session: " + RTSPid);
-          // System.out.println("New RTSP state: ....");
-        }
-      }
-      
-      
-    }
-  }
-
-  // Handler for Play button
-  // -----------------------
-  class playButtonListener implements ActionListener {
-    public void actionPerformed(ActionEvent e) {
-
-      // System.out.println("Play Button pressed !");
-
-      if (state == READY) {
-        // increase RTSP sequence number
-
-        RTSPSeqNb += 1;
-
-        // Send PLAY message to the server
-        send_RTSP_request("PLAY");
-
-        // Wait for the response
-        if (parse_server_response() != 200)
-          System.out.println("Invalid Server Response");
-        else {
-          // change RTSP state and print out new state
-          state = PLAYING;
-          System.out.println("New RTSP state: PLAYING");
-
-          producer.start();
-          consumer.start();
-
-          // start the timer
-          // timer.start();
-        }
-      } // else if state != READY then do nothing
-    }
-  }
-
-  // Handler for Pause button
-  // -----------------------
-  class pauseButtonListener implements ActionListener {
-    public void actionPerformed(ActionEvent e) {
-
-      // System.out.println("Pause Button pressed !");
-
-      if (state == PLAYING) {
-        // increase RTSP sequence number
-        // ........
-
-        RTSPSeqNb += 1;
-
-        // Send PAUSE message to the server
-        send_RTSP_request("PAUSE");
-
-        // Wait for the response
-        if (parse_server_response() != 200)
-          System.out.println("Invalid Server Response");
-        else {
-          // change RTSP state and print out new state
-          state = READY;
-          System.out.println("New RTSP state: READY");
-
-          // stop the timer
-          // timer.stop();
-        }
-      }
-      // else if state != PLAYING then do nothing
-    }
-  }
-
-  // Handler for Teardown button
-  // -----------------------
-  class tearButtonListener implements ActionListener {
-    public void actionPerformed(ActionEvent e) {
-
-      // System.out.println("Teardown Button pressed !");
+  private List<String> getDataAsList(long timeMillis) {
+    return Arrays.asList(
+        String.valueOf(minDelayNetworkMillis),
+        String.valueOf(maxNetworkDelayMillis),
+        String.valueOf(initalPlayoutBufferDelay),
+        String.valueOf(consumeTimeMilis),
+        String.valueOf(rebufferingDelayMilis),
+        String.valueOf(discartProbabilityPercent),
+        String.valueOf(timeMillis),
+        String.valueOf(playoutBuffer.getTimeSpentRebuffering()),
+        String.valueOf(playoutBuffer.getNumTimesRebuffering()),
+        String.valueOf(playoutBuffer.getLatePackets().size())
+    );
+}
 
 
-
-      // increase RTSP sequence number
-      // ..........
-
-      RTSPSeqNb += 1;
-
-      // Send TEARDOWN message to the server
-      send_RTSP_request("TEARDOWN");
-
-      // Wait for the response
-      if (parse_server_response() != 200)
-        System.out.println("Invalid Server Response");
-      else {
-        // change RTSP state and print out new state
-        // ........
-        // System.out.println("New RTSP state: ...");
-
-        state = INIT;
-        System.out.println("New RTSP state: INIT");
-
-        // stop the timer
-        // timer.stop();
-
-        // exit
-        System.exit(0);
-      }
-    }
-  }
-
-  // ------------------------------------
-  // Handler for timer
-  // ------------------------------------
-
-  class timerListener implements ActionListener {
-    public void actionPerformed(ActionEvent e) {
-
-      // Construct a DatagramPacket to receive data from the UDP socket
-      rcvdp = new DatagramPacket(buf, buf.length);
-
-      try {
-        // receive the DP from the socket:
-        RTPsocket.receive(rcvdp);
-
-        // create an RTPpacket object from the DP
-        RTPpacket rtp_packet = new RTPpacket(rcvdp.getData(), rcvdp.getLength());
-
-        // print important header fields of the RTP packet received:
-        // System.out.println("Got RTP packet with SeqNum # " + rtp_packet.getsequencenumber() + " TimeStamp "
-        //     + rtp_packet.gettimestamp() + " ms, of type " + rtp_packet.getpayloadtype());
-
-        // print header bitstream:
-        // rtp_packet.printheader();
-        producer.addPacket(rtp_packet, rtp_packet.SequenceNumber);
-        
-      } catch (InterruptedIOException iioe) {
-        // System.out.println("Nothing to read");
-      } catch (IOException ioe) {
-        System.out.println("Exception caught: " + ioe);
-      }
-    }
-  }
-
-  // ------------------------------------
-  // Parse Server Response
-  // ------------------------------------
   private int parse_server_response() {
     int reply_code = 0;
 

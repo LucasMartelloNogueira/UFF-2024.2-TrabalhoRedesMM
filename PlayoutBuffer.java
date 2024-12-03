@@ -1,13 +1,10 @@
-import java.awt.Image;
-import java.awt.Toolkit;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
-import javax.swing.ImageIcon;
-import javax.swing.JLabel;
 
 public class PlayoutBuffer {
+
+    private static final String label = "PLAYOUT-BUFFER";
 
     private List<PacketData<RTPpacket>> buffer;
     private long initialDelayMillis;
@@ -36,7 +33,8 @@ public class PlayoutBuffer {
 
 
     private void print(String msg) {
-        System.out.printf("[PlayoutBuffer]: %s\n", msg);
+        AppLogger.log(label, msg);
+        Util.printInThread(label, msg);
     }
 
 
@@ -49,8 +47,8 @@ public class PlayoutBuffer {
 
         long scheduledPlayoutTimeMillis = firstPacketTimeMillis + (sequenceNumber-1) * consumePeriodMillis + numTimesRebuffering * rebufferingDelayMillis;
         
-        System.out.printf("scheduled date: %s / timestamp = %d\n" , new Date(scheduledPlayoutTimeMillis).toString(), scheduledPlayoutTimeMillis);
-        System.out.printf("packet date: %s / timestamp = %d\n", new Date(packet.getArrivalTimeMillis()), packet.getArrivalTimeMillis());
+        // System.out.printf("scheduled date: %s / timestamp = %d\n" , new Date(scheduledPlayoutTimeMillis).toString(), scheduledPlayoutTimeMillis);
+        // System.out.printf("packet date: %s / timestamp = %d\n", new Date(packet.getArrivalTimeMillis()), packet.getArrivalTimeMillis());
         
         if (packet.getSequenceNumber() < sequenceNumber) {
             print(String.format("pacote %d chegou fora de ordem / sequence number = %d", packet.getSequenceNumber(), sequenceNumber));
@@ -65,21 +63,6 @@ public class PlayoutBuffer {
         }
         
         consumedPackets.add(packet);
-
-        // RTPpacket rtp_packet = packet.getPacket();
-
-        // // get the payload bitstream from the RTPpacket object
-        // int payload_length = rtp_packet.getpayload_length();
-        // byte[] payload = new byte[payload_length];
-        // rtp_packet.getpayload(payload);
-
-        // // get an Image object from the payload bitstream
-        // Toolkit toolkit = Toolkit.getDefaultToolkit();
-        // Image image = toolkit.createImage(payload, 0, payload_length);
-
-        // // display the image as an ImageIcon object
-        // ImageIcon icon = new ImageIcon(image);
-        // iconLabel.setIcon(icon);
     }
 
 

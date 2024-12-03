@@ -1,30 +1,25 @@
-import java.util.List;
-
-import javax.swing.JLabel;
+import java.util.Date;
 
 public class BufferConsumer extends Thread {
 
     String threadName = "CONSUMER";
-    String separator = "=";
     
-    private List<PacketData<RTPpacket>> channelBuffer;
     private PlayoutBuffer playoutBuffer;
     
-    public BufferConsumer(List<PacketData<RTPpacket>> channelBuffer, PlayoutBuffer playoutBuffer) {
-        this.channelBuffer = channelBuffer;
+    public BufferConsumer(PlayoutBuffer playoutBuffer) {
         this.playoutBuffer = playoutBuffer;
     }
 
     private void print(String message) {
-        Util.printInThread(threadName, separator, message);
+        AppLogger.log(threadName, message);
+        Util.printInThread(threadName, message);
     }
 
     public void run(){
 
-        long start = System.currentTimeMillis();
-
         try {
-            // print("adding playout buffer delay...");
+            print("adding playout buffer delay...");
+            // print(String.format("now: %s", new Date(System.currentTimeMillis()).toString()));
             Thread.sleep(playoutBuffer.getInitialDelayMillis());
         } catch (Exception e) {
             print("error: unable to make BufferConsumer thread sleep for initial delay");
@@ -33,10 +28,13 @@ public class BufferConsumer extends Thread {
         // !(channelBuffer.isEmpty()) || !(playoutBuffer.isEmpty())
         while (true) {
             
+            print(String.format("playout buffer size: %d", playoutBuffer.getSize()));
+            print(String.format("now: %s", new Date(System.currentTimeMillis()).toString()));
+
             if (this.playoutBuffer.isEmpty()) {
                 // print("playout buffer vazio");
                 try {
-                    // print("rebuffering...");
+                    print("rebuffering...");
                     Thread.sleep(playoutBuffer.getRebufferingDelayMillis());
                     playoutBuffer.rebuffer();
                 } catch (Exception e) {
@@ -45,6 +43,7 @@ public class BufferConsumer extends Thread {
             }
             
             try {
+                print("consuming packet");
                 playoutBuffer.consumePacket();
                 Thread.sleep(playoutBuffer.getConsumePeriodMillis());
             } catch (java.util.NoSuchElementException e){
@@ -54,25 +53,6 @@ public class BufferConsumer extends Thread {
             } 
         }
 
-        // long end = System.currentTimeMillis();
-        // print(String.format("END - total time spent: %d", end-start));
-
-        // StringBuffer sb = new StringBuffer();
-        // sb.append("{");
-        // playoutBuffer.getLatePackets().forEach(packetData -> sb.append(packetData.getPacket()));
-        // sb.append("}");
-
-        // print(String.format("late packets: %s", sb.toString()));
-
-        // StringBuffer sb2 = new StringBuffer();
-        // sb2.append("{");
-        // playoutBuffer.getOutOfOrderPackets().forEach(packetData -> sb.append(packetData.getPacket()));
-        // sb2.append("}");
-
-        // print(String.format("out of order packets: %s", sb2.toString()));
-
-        // print(String.format("time spent rebuffering: %d", playoutBuffer.getTimeSpentRebuffering()));
-        // print(String.format("number of rebufferings: %d", playoutBuffer.getNumTimesRebuffering()));
     }
 
 }
