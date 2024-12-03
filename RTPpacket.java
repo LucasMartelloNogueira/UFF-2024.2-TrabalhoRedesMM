@@ -78,7 +78,7 @@ public class RTPpacket {
     System.arraycopy(data, 0, payload, 0, data_length);
 
     // ! Do not forget to uncomment method printheader() below !
-    printheader();
+    // printheader();
 
   }
 

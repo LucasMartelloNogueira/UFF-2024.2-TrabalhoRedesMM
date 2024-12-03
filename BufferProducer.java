@@ -53,7 +53,7 @@ public class BufferProducer extends Thread {
 
         while (true) {
 
-            print(String.format("channel buffer size: %d", channelBuffer.size()));
+            // print(String.format("channel buffer size: %d", channelBuffer.size()));
 
             if (channelBuffer.size() == 0) {
                 continue;
@@ -69,11 +69,11 @@ public class BufferProducer extends Thread {
                 fowardToPlayoutBufferOrRandomDiscart(discartProbabilityPercent, packet);
 
                 long currTimeMilis = System.currentTimeMillis();
-                print(String.format("intervalo entre pacotes : %d", currTimeMilis - timestampMilis));
+                // print(String.format("intervalo entre pacotes : %d", currTimeMilis - timestampMilis));
                 timestampMilis = currTimeMilis;
             } catch (Exception e) {
-                print(e.toString());
-                print("erro ao deixar a thread dormir / nao retirou elemento da fila");
+                // print(e.toString());
+                // print("erro ao deixar a thread dormir / nao retirou elemento da fila");
 
             }
         }

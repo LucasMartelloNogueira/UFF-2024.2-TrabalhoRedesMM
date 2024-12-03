@@ -40,7 +40,7 @@ public class PlayoutBuffer {
     }
 
 
-    public void consumePacket(JLabel iconLabel) throws java.util.NoSuchElementException{
+    public void consumePacket() throws java.util.NoSuchElementException{
 
         
         PacketData<RTPpacket> packet = buffer.removeFirst();
@@ -66,20 +66,20 @@ public class PlayoutBuffer {
         
         consumedPackets.add(packet);
 
-        RTPpacket rtp_packet = packet.getPacket();
+        // RTPpacket rtp_packet = packet.getPacket();
 
-        // get the payload bitstream from the RTPpacket object
-        int payload_length = rtp_packet.getpayload_length();
-        byte[] payload = new byte[payload_length];
-        rtp_packet.getpayload(payload);
+        // // get the payload bitstream from the RTPpacket object
+        // int payload_length = rtp_packet.getpayload_length();
+        // byte[] payload = new byte[payload_length];
+        // rtp_packet.getpayload(payload);
 
-        // get an Image object from the payload bitstream
-        Toolkit toolkit = Toolkit.getDefaultToolkit();
-        Image image = toolkit.createImage(payload, 0, payload_length);
+        // // get an Image object from the payload bitstream
+        // Toolkit toolkit = Toolkit.getDefaultToolkit();
+        // Image image = toolkit.createImage(payload, 0, payload_length);
 
-        // display the image as an ImageIcon object
-        ImageIcon icon = new ImageIcon(image);
-        iconLabel.setIcon(icon);
+        // // display the image as an ImageIcon object
+        // ImageIcon icon = new ImageIcon(image);
+        // iconLabel.setIcon(icon);
     }
 
 

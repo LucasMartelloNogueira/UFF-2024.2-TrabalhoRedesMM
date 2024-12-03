@@ -9,12 +9,10 @@ public class BufferConsumer extends Thread {
     
     private List<PacketData<RTPpacket>> channelBuffer;
     private PlayoutBuffer playoutBuffer;
-    private JLabel iconLabel;
     
-    public BufferConsumer(List<PacketData<RTPpacket>> channelBuffer, PlayoutBuffer playoutBuffer, JLabel iconLabel) {
+    public BufferConsumer(List<PacketData<RTPpacket>> channelBuffer, PlayoutBuffer playoutBuffer) {
         this.channelBuffer = channelBuffer;
         this.playoutBuffer = playoutBuffer;
-        this.iconLabel = iconLabel;
     }
 
     private void print(String message) {
@@ -26,7 +24,7 @@ public class BufferConsumer extends Thread {
         long start = System.currentTimeMillis();
 
         try {
-            print("adding playout buffer delay...");
+            // print("adding playout buffer delay...");
             Thread.sleep(playoutBuffer.getInitialDelayMillis());
         } catch (Exception e) {
             print("error: unable to make BufferConsumer thread sleep for initial delay");
@@ -36,23 +34,23 @@ public class BufferConsumer extends Thread {
         while (true) {
             
             if (this.playoutBuffer.isEmpty()) {
-                print("playout buffer vazio");
+                // print("playout buffer vazio");
                 try {
-                    print("rebuffering...");
+                    // print("rebuffering...");
                     Thread.sleep(playoutBuffer.getRebufferingDelayMillis());
                     playoutBuffer.rebuffer();
                 } catch (Exception e) {
-                    print("error: unable to make BufferConsumer thread sleep for rebuffering delay");
+                    // print("error: unable to make BufferConsumer thread sleep for rebuffering delay");
                 }
             }
             
             try {
-                playoutBuffer.consumePacket(iconLabel);
+                playoutBuffer.consumePacket();
                 Thread.sleep(playoutBuffer.getConsumePeriodMillis());
             } catch (java.util.NoSuchElementException e){
-                print("acabaram os pacotes");
+                // print("acabaram os pacotes");
             } catch (InterruptedException e) {
-                print(String.format("error: unable to make BufferConsumer thread sleep for consume delay"));
+                // print(String.format("error: unable to make BufferConsumer thread sleep for consume delay"));
             } 
         }
 

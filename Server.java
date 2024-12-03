@@ -68,6 +68,7 @@ public class Server extends JFrame implements ActionListener {
     super("Server");
 
     // init Timer
+    // TODO: substituir por timer que não seja do java swing
     timer = new Timer(FRAME_PERIOD, this);
     timer.setInitialDelay(0);
     timer.setCoalesce(true);
@@ -76,17 +77,17 @@ public class Server extends JFrame implements ActionListener {
     buf = new byte[15000];
 
     // Handler to close the main window
-    addWindowListener(new WindowAdapter() {
-      public void windowClosing(WindowEvent e) {
-        // stop the timer and exit
-        timer.stop();
-        System.exit(0);
-      }
-    });
+    // addWindowListener(new WindowAdapter() {
+    //   public void windowClosing(WindowEvent e) {
+    //     // stop the timer and exit
+    //     timer.stop();
+    //     System.exit(0);
+    //   }
+    // });
 
     // GUI:
-    label = new JLabel("Send frame #        ", JLabel.CENTER);
-    getContentPane().add(label, BorderLayout.CENTER);
+    // label = new JLabel("Send frame #        ", JLabel.CENTER);
+    // getContentPane().add(label, BorderLayout.CENTER);
   }
 
   // ------------------------------------
@@ -97,12 +98,12 @@ public class Server extends JFrame implements ActionListener {
     Server theServer = new Server();
 
     // show GUI:
-    theServer.pack();
-    theServer.setVisible(true);
+    // theServer.pack();
+    // theServer.setVisible(true);
 
     // get RTSP socket port from the command line
     int RTSPport = Integer.parseInt(argv[0]);
-
+    
     // Initiate TCP connection with the client for the RTSP session
     ServerSocket listenSocket = new ServerSocket(RTSPport);
     theServer.RTSPsocket = listenSocket.accept();
