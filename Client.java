@@ -46,28 +46,50 @@ public class Client {
   static int MJPEG_TYPE = 26; // RTP payload type for MJPEG video
 
   // parameters for playout buffer
-  int minDelayNetworkMillis = 200;
-  int maxNetworkDelayMillis = 400;
-  long initalPlayoutBufferDelay = 1000;
+  int minDelayNetworkMillis = 50;
+  int maxNetworkDelayMillis;
+  long initalPlayoutBufferDelay;
   long consumeTimeMilis = 20;
-  long rebufferingDelayMilis = 1000;
+  long rebufferingDelayMilis;
   int discartProbabilityPercent = 5;
 
-  PlayoutBuffer playoutBuffer = new PlayoutBuffer(initalPlayoutBufferDelay, consumeTimeMilis, rebufferingDelayMilis);
-  List<PacketData<RTPpacket>> channelBuffer = new ArrayList<>();
+  PlayoutBuffer playoutBuffer;
+  List<PacketData<RTPpacket>> channelBuffer;
 
-  BufferProducer producer = new BufferProducer(minDelayNetworkMillis, maxNetworkDelayMillis, playoutBuffer, channelBuffer, discartProbabilityPercent);
-  BufferConsumer consumer = new BufferConsumer(playoutBuffer);
+  BufferProducer producer;
+  BufferConsumer consumer;
 
 
-  public Client() {
+  public Client(int maxNetworkDelayMillis, long initalPlayoutBufferDelay, long rebufferingDelayMilis) {
+    this.maxNetworkDelayMillis = maxNetworkDelayMillis;
+    this.initalPlayoutBufferDelay = initalPlayoutBufferDelay;
+    this.rebufferingDelayMilis = rebufferingDelayMilis;
+
+    this.playoutBuffer = new PlayoutBuffer(initalPlayoutBufferDelay, consumeTimeMilis, rebufferingDelayMilis);
+    this.channelBuffer = new ArrayList<>();
+
+    long start = System.currentTimeMillis();
+    this.producer = new BufferProducer(minDelayNetworkMillis, maxNetworkDelayMillis, playoutBuffer, channelBuffer, discartProbabilityPercent, (Void unused) -> {
+      consumer.setIsRunning(false);
+      return null;
+    });
+    this.consumer = new BufferConsumer(playoutBuffer, channelBuffer, start, (Long startTime) -> {
+      teardown(startTime);
+      return null;
+    });
 
     buf = new byte[15000];
   }
 
   public static void main(String argv[]) throws Exception {
+
+    // parameters for simulation
+    int maxNetworkDelayMillis = Integer.parseInt(argv[3]);
+    long initalPlayoutBufferDelay = Integer.parseInt(argv[4]);
+    long rebufferingDelayMilis = Integer.parseInt(argv[5]);
+
     // Create a Client object
-    Client theClient = new Client();
+    Client theClient = new Client(maxNetworkDelayMillis, initalPlayoutBufferDelay, rebufferingDelayMilis);
 
     // get server RTSP port and IP address from the command line
     // ------------------
@@ -77,11 +99,6 @@ public class Client {
 
     // get video filename to request:
     VideoFileName = argv[2];
-
-    // parameters for simulation
-    theClient.maxNetworkDelayMillis = Integer.parseInt(argv[3]);
-    theClient.initalPlayoutBufferDelay = Integer.parseInt(argv[4]);
-    theClient.rebufferingDelayMilis = Integer.parseInt(argv[5]);
 
     // Establish a TCP connection with the server to exchange RTSP messages
     // ------------------
@@ -94,10 +111,8 @@ public class Client {
     // init RTSP state:
     state = INIT;
 
-    long start = System.currentTimeMillis();
-
     theClient.setup();
-    theClient.play(start);
+    theClient.play();
   }
 
   class GetVideoTask extends TimerTask {
@@ -172,7 +187,7 @@ public class Client {
     }
   }
 
-  private void play(long start) {
+  private void play() {
     if (state == READY) {
       // increase RTSP sequence number
 
@@ -193,7 +208,7 @@ public class Client {
         timer = new WaitingTimer(0, consumeTimeMilis);
         timer.setTask(new GetVideoTask((Void unused) -> {
           timer.stop();
-          teardown(start);
+          producer.setIsRunning(false);
           return null;
         }));
         timer.start();
@@ -224,10 +239,13 @@ public class Client {
         System.out.println("New RTSP state: INIT");
 
         long end = System.currentTimeMillis();
-        System.out.printf("total time: %d\n", end-start);
-        System.out.printf("time rebuferring: %d\n", playoutBuffer.getTimeSpentRebuffering());
-        System.out.printf("total times rebuffering: %d\n", playoutBuffer.getNumTimesRebuffering());
-        System.out.printf("num late packets: %d\n", playoutBuffer.getLatePackets().size());
+        print(String.format("total time: %d\n", end-start));
+        print(String.format("time rebuferring: %d\n", playoutBuffer.getTimeSpentRebuffering()));
+        print(String.format("total times rebuffering: %d\n", playoutBuffer.getNumTimesRebuffering()));
+        print(String.format("num consumed packets: %d\n", playoutBuffer.getConsumedPackets().size()));
+        print(String.format("num late packets: %d\n", playoutBuffer.getLatePackets().size()));
+        print(String.format("num out of order packets: %d\n", playoutBuffer.getOutOfOrderPackets().size()));
+        print(String.format("num packets lost to network: %d\n", producer.getLostPackets().size()));
 
         Util.writeArrayListToCSV(getDataAsList(end-start), "../data.csv");
 
@@ -246,7 +264,10 @@ public class Client {
         String.valueOf(timeMillis),
         String.valueOf(playoutBuffer.getTimeSpentRebuffering()),
         String.valueOf(playoutBuffer.getNumTimesRebuffering()),
-        String.valueOf(playoutBuffer.getLatePackets().size())
+        String.valueOf(playoutBuffer.getConsumedPackets().size()),
+        String.valueOf(playoutBuffer.getLatePackets().size()),
+        String.valueOf(playoutBuffer.getOutOfOrderPackets().size()),
+        String.valueOf(producer.getLostPackets().size())
     );
 }
 
@@ -318,6 +339,11 @@ public class Client {
       System.out.println("Exception caught: " + ex);
       System.exit(0);
     }
+  }
+
+  private void print(String msg){
+    Util.printInThread("CLIENT", msg);
+    AppLogger.log("CLIENT", msg);
   }
 
 }// end of Class Client

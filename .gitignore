@@ -2,3 +2,6 @@
 dist
 logs
 data.csv
+.venv
+TODO.txt
+packetsTimesData

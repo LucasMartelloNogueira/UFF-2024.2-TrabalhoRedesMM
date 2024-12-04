@@ -1,10 +1,12 @@
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 
 public class PlayoutBuffer {
 
     private static final String label = "PLAYOUT-BUFFER";
+    private final String timesFilename = getCsvDataFilename();
 
     private List<PacketData<RTPpacket>> buffer;
     private long initialDelayMillis;
@@ -29,12 +31,22 @@ public class PlayoutBuffer {
         this.consumedPackets = new ArrayList<PacketData<RTPpacket>>();
         this.latePackets = new ArrayList<PacketData<RTPpacket>>();
         this.outOfOrderPackets = new ArrayList<PacketData<RTPpacket>>();
+
+        print(String.format("initial delay: %d", initialDelayMillis));
+        print(String.format("consume period: %d", consumePeriodMillis));
+        print(String.format("rebuffering delay: %d", rebufferingDelayMillis));
     }
 
 
     private void print(String msg) {
         AppLogger.log(label, msg);
         Util.printInThread(label, msg);
+    }
+
+    private String getCsvDataFilename() {
+        String filename = String.format("../packetsTimesData/%s.csv", Util.getLastFileNumFromDir("../packetsTimesData"));
+        Util.writeArrayListToCSV(Arrays.asList("packetSequenceNumber", "scheduledPlayoutTimeMillis", "arrivalTimeMillis"), filename);
+        return filename;
     }
 
 
@@ -49,6 +61,9 @@ public class PlayoutBuffer {
         
         // System.out.printf("scheduled date: %s / timestamp = %d\n" , new Date(scheduledPlayoutTimeMillis).toString(), scheduledPlayoutTimeMillis);
         // System.out.printf("packet date: %s / timestamp = %d\n", new Date(packet.getArrivalTimeMillis()), packet.getArrivalTimeMillis());
+
+        List<String> times = Arrays.asList(String.valueOf(sequenceNumber), String.valueOf(scheduledPlayoutTimeMillis), String.valueOf(packet.getArrivalTimeMillis()));
+        Util.writeArrayListToCSV(times, timesFilename);
         
         if (packet.getSequenceNumber() < sequenceNumber) {
             print(String.format("pacote %d chegou fora de ordem / sequence number = %d", packet.getSequenceNumber(), sequenceNumber));
@@ -108,6 +123,10 @@ public class PlayoutBuffer {
 
     public List<PacketData<RTPpacket>> getOutOfOrderPackets() {
         return outOfOrderPackets;
+    }
+
+    public List<PacketData<RTPpacket>> getConsumedPackets() {
+        return consumedPackets;
     }
 
 }

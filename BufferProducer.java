@@ -2,6 +2,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.SplittableRandom;
+import java.util.function.Function;
 
 public class BufferProducer extends Thread {
 
@@ -14,15 +15,19 @@ public class BufferProducer extends Thread {
     private PlayoutBuffer playoutBuffer;
     private List<PacketData<RTPpacket>> lostPackets;
     private int discartProbabilityPercent;
+    private boolean isRunning;
+    private Function<Void, Void> consumerCallback;
 
     public BufferProducer(int minDelayMiliseconds, int maxDelayMiliseconds, PlayoutBuffer playoutBuffer,
-            List<PacketData<RTPpacket>> channelBuffer, int discartProbabilityPercent) {
+            List<PacketData<RTPpacket>> channelBuffer, int discartProbabilityPercent, Function<Void, Void> consumerCallback) {
         this.minDelayMiliseconds = minDelayMiliseconds;
         this.maxDelayMiliseconds = maxDelayMiliseconds;
         this.channelBuffer = channelBuffer;
         this.playoutBuffer = playoutBuffer;
         this.lostPackets = new ArrayList<PacketData<RTPpacket>>();
         this.discartProbabilityPercent = discartProbabilityPercent;
+        this.isRunning = true;
+        this.consumerCallback = consumerCallback;
     }
 
     private void print(String message) {
@@ -42,16 +47,24 @@ public class BufferProducer extends Thread {
         }
     }
 
+    public List<PacketData<RTPpacket>> getLostPackets() {
+        return this.lostPackets;
+    }
+
     public void addPacket(RTPpacket packet, int sequenceNumber) {
         PacketData<RTPpacket> packetData = new PacketData<RTPpacket>(packet, 0, sequenceNumber);
         channelBuffer.add(packetData);
+    }
+
+    public void setIsRunning(boolean running) {
+        this.isRunning = running;
     }
 
     public void run() {
 
         long timestampMilis = System.currentTimeMillis();
 
-        while (true) {
+        while (isRunning) {
 
             print(String.format("channel buffer size: %d", channelBuffer.size()));
             // print("aqui");
@@ -73,15 +86,13 @@ public class BufferProducer extends Thread {
                     // print(String.format("intervalo entre pacotes : %d", currTimeMilis - timestampMilis));
                     timestampMilis = currTimeMilis;
                 } catch (Exception e) {
-                    // print(e.toString());
+                    print(e.toString());
                     // print("erro ao deixar a thread dormir / nao retirou elemento da fila");
     
                 }
             }
-            
-            // System.out.println("[CHANNEL BUFFER] - aqui");
-
         }
 
+        consumerCallback.apply(null);
     }
 }
