@@ -1,5 +1,6 @@
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 
@@ -15,6 +16,7 @@ public class PlayoutBuffer {
     private int sequenceNumber;
     private int numTimesRebuffering;
     private long firstPacketTimeMillis;
+    private long startTime;
 
     private List<PacketData<RTPpacket>> consumedPackets;
     private List<PacketData<RTPpacket>> latePackets;
@@ -28,6 +30,7 @@ public class PlayoutBuffer {
         this.sequenceNumber = -1;
         this.numTimesRebuffering = 0;
         this.firstPacketTimeMillis = 0;
+        this.startTime = 0;
         this.consumedPackets = new ArrayList<PacketData<RTPpacket>>();
         this.latePackets = new ArrayList<PacketData<RTPpacket>>();
         this.outOfOrderPackets = new ArrayList<PacketData<RTPpacket>>();
@@ -52,17 +55,24 @@ public class PlayoutBuffer {
 
     public void consumePacket() throws java.util.NoSuchElementException{
 
-        
         PacketData<RTPpacket> packet = buffer.removeFirst();
-        firstPacketTimeMillis = sequenceNumber == -1 ? System.currentTimeMillis() : firstPacketTimeMillis;
+        // como todos os pacotes esperam o atraso inicial antes de serem consumidos, temos que tirar esse tempo
+        long packetActualTime = System.currentTimeMillis() - initialDelayMillis;
+        // firstPacketTimeMillis = sequenceNumber == -1 ? packetActualTime : firstPacketTimeMillis;
         sequenceNumber++;
 
-        long scheduledPlayoutTimeMillis = firstPacketTimeMillis + (sequenceNumber-1) * consumePeriodMillis + numTimesRebuffering * rebufferingDelayMillis;
+        // long scheduledPlayoutTimeMillis = firstPacketTimeMillis + (sequenceNumber * consumePeriodMillis) + (numTimesRebuffering * rebufferingDelayMillis);
+        long scheduledPlayoutTimeMillis = startTime + initialDelayMillis + (sequenceNumber * consumePeriodMillis) + (numTimesRebuffering * rebufferingDelayMillis);
         
-        // System.out.printf("scheduled date: %s / timestamp = %d\n" , new Date(scheduledPlayoutTimeMillis).toString(), scheduledPlayoutTimeMillis);
-        // System.out.printf("packet date: %s / timestamp = %d\n", new Date(packet.getArrivalTimeMillis()), packet.getArrivalTimeMillis());
+        print(String.format("start: %d", startTime));
+        print(String.format("consume time: %d", sequenceNumber * consumePeriodMillis));
+        print(String.format("rebuffering delay: %d", numTimesRebuffering * rebufferingDelayMillis));
+        print(String.format("scheduled date: %s / timestamp = %d\n" , new Date(scheduledPlayoutTimeMillis).toString(), scheduledPlayoutTimeMillis));
+        print(String.format("comsumption date: %s / timestamp = %d\n" , new Date(packetActualTime).toString(), packetActualTime));
 
-        List<String> times = Arrays.asList(String.valueOf(sequenceNumber), String.valueOf(scheduledPlayoutTimeMillis), String.valueOf(packet.getArrivalTimeMillis()));
+        // String.valueOf(packet.getArrivalTimeMillis()
+
+        List<String> times = Arrays.asList(String.valueOf(sequenceNumber), String.valueOf(scheduledPlayoutTimeMillis), String.valueOf(packetActualTime));
         Util.writeArrayListToCSV(times, timesFilename);
         
         if (packet.getSequenceNumber() < sequenceNumber) {
@@ -71,7 +81,7 @@ public class PlayoutBuffer {
             return;
         }
 
-        if (packet.getArrivalTimeMillis() > scheduledPlayoutTimeMillis) {
+        if (packetActualTime > scheduledPlayoutTimeMillis) {
             print(String.format("pacote %d chegou atrasado", packet.getSequenceNumber()));
             latePackets.add(packet);
             return;
@@ -127,6 +137,10 @@ public class PlayoutBuffer {
 
     public List<PacketData<RTPpacket>> getConsumedPackets() {
         return consumedPackets;
+    }
+
+    public void setStartTime(long start) {
+        this.startTime = start;
     }
 
 }

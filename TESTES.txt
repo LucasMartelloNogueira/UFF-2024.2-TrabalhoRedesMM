@@ -1,0 +1,25 @@
+caso 1: BASELINE
+
+ambiente estável, pouco Jitter, rede sem perdas de pacote e bastante tempo de rebuferização
+(linha 1 de data.csv)
+
+minDelayNetworkMillis = 50;
+maxNetworkDelayMillis = 100;
+initalPlayoutBufferDelay = 10000;
+consumeTimeMilis = 20;
+rebufferingDelayMilis = 5000;
+discartProbabilityPercent = 0;
+
+
+=====================================================
+
+
+caso 2: JITTER ALTO
+ambiente com muito Jitter, rede sem perda, um pouco menos tempo de atraso inicial de buffer e de tempo de rebuferização
+
+minDelayNetworkMillis = 50;
+maxNetworkDelayMillis = 500;
+initalPlayoutBufferDelay = 5000;
+consumeTimeMilis = 20;
+rebufferingDelayMilis = 2000;
+discartProbabilityPercent = 0;

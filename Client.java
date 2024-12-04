@@ -46,12 +46,12 @@ public class Client {
   static int MJPEG_TYPE = 26; // RTP payload type for MJPEG video
 
   // parameters for playout buffer
-  int minDelayNetworkMillis = 50;
+  int minDelayNetworkMillis;
   int maxNetworkDelayMillis;
   long initalPlayoutBufferDelay;
   long consumeTimeMilis = 20;
   long rebufferingDelayMilis;
-  int discartProbabilityPercent = 5;
+  int discartProbabilityPercent;
 
   PlayoutBuffer playoutBuffer;
   List<PacketData<RTPpacket>> channelBuffer;
@@ -60,19 +60,22 @@ public class Client {
   BufferConsumer consumer;
 
 
-  public Client(int maxNetworkDelayMillis, long initalPlayoutBufferDelay, long rebufferingDelayMilis) {
+  public Client(int minDelayNetworkMillis, int maxNetworkDelayMillis, long initalPlayoutBufferDelay, long rebufferingDelayMilis, int discartProbabilityPercent) {
+    this.minDelayNetworkMillis = minDelayNetworkMillis;
     this.maxNetworkDelayMillis = maxNetworkDelayMillis;
     this.initalPlayoutBufferDelay = initalPlayoutBufferDelay;
     this.rebufferingDelayMilis = rebufferingDelayMilis;
-
+    this.discartProbabilityPercent = discartProbabilityPercent;
+    
     this.playoutBuffer = new PlayoutBuffer(initalPlayoutBufferDelay, consumeTimeMilis, rebufferingDelayMilis);
     this.channelBuffer = new ArrayList<>();
-
-    long start = System.currentTimeMillis();
+    
     this.producer = new BufferProducer(minDelayNetworkMillis, maxNetworkDelayMillis, playoutBuffer, channelBuffer, discartProbabilityPercent, (Void unused) -> {
       consumer.setIsRunning(false);
       return null;
     });
+    
+    long start = System.currentTimeMillis();
     this.consumer = new BufferConsumer(playoutBuffer, channelBuffer, start, (Long startTime) -> {
       teardown(startTime);
       return null;
@@ -84,12 +87,15 @@ public class Client {
   public static void main(String argv[]) throws Exception {
 
     // parameters for simulation
-    int maxNetworkDelayMillis = Integer.parseInt(argv[3]);
-    long initalPlayoutBufferDelay = Integer.parseInt(argv[4]);
-    long rebufferingDelayMilis = Integer.parseInt(argv[5]);
+    int minDelayNetworkMillis = Integer.parseInt(argv[3]);
+    int maxNetworkDelayMillis = Integer.parseInt(argv[4]);
+    long initalPlayoutBufferDelay = Integer.parseInt(argv[5]);
+    long rebufferingDelayMilis = Integer.parseInt(argv[6]);
+    int discartProbabilityPercent = Integer.parseInt(argv[7]);
 
     // Create a Client object
-    Client theClient = new Client(maxNetworkDelayMillis, initalPlayoutBufferDelay, rebufferingDelayMilis);
+    Client theClient = new Client(minDelayNetworkMillis, maxNetworkDelayMillis, 
+                        initalPlayoutBufferDelay, rebufferingDelayMilis, discartProbabilityPercent);
 
     // get server RTSP port and IP address from the command line
     // ------------------
@@ -204,6 +210,8 @@ public class Client {
         state = PLAYING;
         System.out.println("New RTSP state: PLAYING");
 
+        playoutBuffer.setStartTime(System.currentTimeMillis());
+
         // start the timer
         timer = new WaitingTimer(0, consumeTimeMilis);
         timer.setTask(new GetVideoTask((Void unused) -> {
@@ -212,7 +220,7 @@ public class Client {
           return null;
         }));
         timer.start();
-
+        
         producer.start();
         consumer.start();
       }

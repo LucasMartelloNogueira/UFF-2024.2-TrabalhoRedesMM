@@ -17,7 +17,6 @@ public class BufferConsumer extends Thread {
         this.start = start;
         this.callback = callback;
         this.isRunning = true;
-
     }
 
     

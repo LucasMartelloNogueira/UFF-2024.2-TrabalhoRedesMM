@@ -37,6 +37,13 @@ public class BufferProducer extends Thread {
     
     // simula quando um pacote é perdido pela rede
     private void fowardToPlayoutBufferOrRandomDiscart(int discartProbabilityPercent, PacketData<RTPpacket> packet) {
+
+        if (discartProbabilityPercent == 0) {
+            print(String.format("retirou pacote %d do channelBuffer e adicionou ao playoutBuffer", packet.getPacket().SequenceNumber));
+            playoutBuffer.add(packet);
+            return;
+        }
+
         boolean willDiscartPacket = random.nextInt(0, 100) <= discartProbabilityPercent;
         if (willDiscartPacket) {
             print(String.format("pacote %d perdido pela rede", packet.getPacket().SequenceNumber));
