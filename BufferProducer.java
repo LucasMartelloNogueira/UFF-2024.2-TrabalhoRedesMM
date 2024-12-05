@@ -71,7 +71,7 @@ public class BufferProducer extends Thread {
 
         long timestampMilis = System.currentTimeMillis();
 
-        while (isRunning) {
+        while (isRunning || channelBuffer.size() > 0) {
 
             print(String.format("channel buffer size: %d", channelBuffer.size()));
             // print("aqui");
